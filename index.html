@@ -73,42 +73,93 @@
           <h2 id="dashboardGreeting">שלום, מתאמן 👋</h2>
           <p id="dashboardDate"></p>
         </div>
-        <button class="btn-action-primary" id="dashboardAddMealBtn" type="button">＋ הוספת ארוחה</button>
       </div>
-      <div class="hero-dashboard-grid">
-        <div class="glass-card energy-overview-card">
-          <div class="card-header-flex">
-            <div>
-              <span class="eyebrow">התקדמות יומית</span>
-              <h2>מאזן קלוריות</h2>
-            </div>
-            <span class="dashboard-icon">◉</span>
-          </div>
-          <div class="calorie-overview">
-            <div class="apple-rings-svg-container">
-              <svg viewBox="0 0 160 160">
-                <circle class="ring-bg" cx="80" cy="80" r="65"></circle>
-                <circle class="ring-bar calories" id="ringCalories" cx="80" cy="80" r="65" stroke-dasharray="408.4" stroke-dashoffset="408.4"></circle>
-              </svg>
-              <div class="rings-center-text">
-                <div class="rings-center-val" id="ringConsumedCals">0</div>
-                <div class="rings-center-sub">קלוריות נאכלו</div>
+      <section class="dashboard-topic" aria-labelledby="lifestyleTopicTitle">
+        <div class="dashboard-topic-heading">
+          <span class="eyebrow">התקדמות יומית</span>
+          <h2 id="lifestyleTopicTitle">אורח חיים</h2>
+        </div>
+        <div class="dashboard-section-heading">
+          <div><span class="eyebrow">עקביות היא המפתח</span><h3>היום שלך</h3></div>
+          <span class="dashboard-date-chip" id="todayDateChip"></span>
+        </div>
+        <div class="daily-cards-grid lifestyle-cards-grid">
+          <article class="daily-card calorie-daily-card">
+            <div class="daily-card-heading"><span class="daily-card-icon">◉</span><span>מאזן קלוריות יומי</span></div>
+            <div class="calorie-daily-content">
+              <div class="apple-rings-svg-container">
+                <svg viewBox="0 0 160 160" aria-hidden="true">
+                  <circle class="ring-bg" cx="80" cy="80" r="65"></circle>
+                  <circle class="ring-bar calories" id="ringCalories" cx="80" cy="80" r="65" stroke-dasharray="408.4" stroke-dashoffset="408.4"></circle>
+                </svg>
+                <div class="rings-center-text">
+                  <div class="rings-center-val" id="ringConsumedCals">0</div>
+                  <div class="rings-center-sub">קל׳ נאכלו</div>
+                </div>
+              </div>
+              <div class="calorie-daily-details">
+                <div><span>יעד יומי</span><strong><span id="calorieTarget">0</span> קל׳</strong></div>
+                <div><span>נותרו</span><strong><span id="ringRemainingCals">0</span> קל׳</strong></div>
               </div>
             </div>
-            <div class="calorie-details">
-              <div><span class="calorie-dot"></span><span>יעד יומי</span><strong><span id="calorieTarget">0</span> קל׳</strong></div>
-              <div><span class="calorie-dot consumed"></span><span>נצרכו</span><strong><span id="calorieConsumed">0</span> קל׳</strong></div>
-              <div><span class="calorie-dot remaining"></span><span>נותרו</span><strong><span id="ringRemainingCals">0</span> קל׳</strong></div>
+            <p id="calorieBalanceNotice" class="calorie-balance-notice" role="status" aria-live="polite" hidden></p>
+            <button class="text-action" type="button" data-open-tab="tab-nutrition">למעקב תזונה <span aria-hidden="true">←</span></button>
+          </article>
+          <article class="daily-card workout-daily-card">
+            <div class="daily-card-heading"><span class="daily-card-icon">⌁</span><span>אימוני השבוע</span></div>
+            <div class="daily-card-main"><div class="mini-ring workout-mini-ring"><span id="weeklyWorkoutCount">0/5</span></div><div><strong id="weeklyWorkoutHeadline">0 מתוך 5 אימונים</strong><span>ממשיכים בקצב שלך</span></div></div>
+            <button class="text-action" type="button" data-open-tab="tab-workouts">צפייה באימונים <span aria-hidden="true">←</span></button>
+          </article>
+          <article class="daily-card water-daily-card">
+            <div class="daily-card-heading"><span class="daily-card-icon">◉</span><span>מאזן מים יומי</span></div>
+            <div class="water-measuring-display">
+              <svg class="water-measuring-cup" viewBox="0 0 110 132" role="img" aria-label="כוס מדידה המתמלאת לפי צריכת המים היומית">
+                <defs>
+                  <clipPath id="measuringCupClip"><path d="M20 10h70l-8 108q-27 12-54 0z"></path></clipPath>
+                  <linearGradient id="waterFillGradient" x1="0" x2="1" y1="0" y2="1">
+                    <stop offset="0" stop-color="#67e8f9"></stop><stop offset="1" stop-color="#4f46e5"></stop>
+                  </linearGradient>
+                </defs>
+                <g clip-path="url(#measuringCupClip)">
+                  <rect id="waterCupFill" x="20" y="118" width="70" height="0" fill="url(#waterFillGradient)"></rect>
+                  <path id="waterCupSurface" d="M20 118 Q30 114 40 118 T60 118 T80 118 T100 118" fill="none" stroke="#d9fbff" stroke-width="2"></path>
+                </g>
+                <path class="water-cup-outline" d="M20 10h70l-8 108q-27 12-54 0z"></path>
+                <path class="water-cup-handle" d="M90 27h8q12 0 12 13v18q0 13-12 13h-5"></path>
+                <path class="water-cup-mark" d="M25 38h17M25 58h12M24 78h17M23 98h12"></path>
+                <text class="water-cup-unit" x="55" y="31" text-anchor="middle">מ״ל</text>
+              </svg>
+              <div class="water-measuring-copy">
+                <strong><span id="waterProgressText" dir="ltr">0 / 2,800</span> מ״ל</strong>
+                <span>מתוך יעד השתייה היומי</span>
+              </div>
             </div>
-          </div>
-          <p id="calorieBalanceNotice" class="calorie-balance-notice" role="status" aria-live="polite" hidden></p>
+            <button class="text-action" id="addWaterBtn" type="button">＋ כוס מים (250 מ״ל)</button>
+          </article>
+          <article class="daily-card sleep-daily-card">
+            <div class="daily-card-heading"><span class="daily-card-icon">☾</span><span>מעקב שינה</span></div>
+            <div class="daily-card-main sleep-main"><div><strong><span id="sleepHoursValue">7.5</span> שעות</strong><span id="sleepGoalText">יעד 8 שעות</span></div><span class="sleep-icon" aria-hidden="true">✦</span></div>
+            <form id="sleepForm" class="sleep-form">
+              <label for="sleepHoursInput">עדכון שעות שינה</label>
+              <input id="sleepHoursInput" type="number" name="hours" min="0" max="24" step="0.5" value="7.5" required>
+              <button type="submit" aria-label="שמירת שעות שינה">שמירה</button>
+            </form>
+          </article>
         </div>
+      </section>
 
-        <div class="glass-card">
+      <section class="dashboard-topic nutrition-topic" aria-labelledby="nutritionTopicTitle">
+        <div class="dashboard-topic-heading">
+          <span class="eyebrow">בחירות יומיומיות</span>
+          <h2 id="nutritionTopicTitle">מיקוד־תזונה</h2>
+          <button class="btn-action-primary" id="dashboardAddMealBtn" type="button">＋ הוספת ארוחה</button>
+        </div>
+        <div class="nutrition-dashboard-grid">
+        <div class="glass-card nutrition-macro-card">
           <div class="card-header-flex macro-heading">
             <div>
               <span class="eyebrow">היעדים שלך להיום</span>
-              <h2>מאקרו־נוטריאנטים</h2>
+              <h2>מעקב תזונה יומי</h2>
             </div>
             <span class="dashboard-icon">◈</span>
           </div>
@@ -126,80 +177,28 @@
               <div class="macro-track"><span id="fatProgress"></span></div>
             </div>
           </div>
-          <form id="dailyTargetsForm" class="daily-targets-form" aria-label="עריכת יעדי הצריכה היומיים">
-            <label>קלוריות <input name="targetCalories" type="number" min="500" max="10000" step="50" required></label>
-            <label>חלבון (גרם) <input name="targetProtein" type="number" min="0" max="1000" step="1" required></label>
-            <label>פחמימות (גרם) <input name="targetCarbs" type="number" min="0" max="1500" step="1" required></label>
-            <label>שומן (גרם) <input name="targetFat" type="number" min="0" max="1000" step="1" required></label>
-            <button class="btn-action-secondary" type="submit">שמירת יעדי צריכה</button>
-          </form>
+          <button class="btn-action-secondary edit-nutrition-targets-btn" id="openNutritionTargetsBtn" type="button">⚙ עריכת יעדי תזונה</button>
         </div>
-      </div>
-
-      <div class="dashboard-section-heading">
-        <div>
-          <span class="eyebrow">עקביות היא המפתח</span>
-          <h2>היום שלך</h2>
-        </div>
-        <span class="dashboard-date-chip" id="todayDateChip"></span>
-      </div>
-      <div class="daily-cards-grid">
-        <article class="daily-card workout-daily-card">
-          <div class="daily-card-heading"><span class="daily-card-icon">⌁</span><span>אימוני השבוע</span></div>
-          <div class="daily-card-main"><div class="mini-ring workout-mini-ring"><span id="weeklyWorkoutCount">0/5</span></div><div><strong id="weeklyWorkoutHeadline">0 מתוך 5 אימונים</strong><span>ממשיכים בקצב שלך</span></div></div>
-          <button class="text-action" type="button" data-open-tab="tab-workouts">צפייה באימונים <span aria-hidden="true">←</span></button>
-        </article>
-        <article class="daily-card meals-daily-card">
-          <div class="daily-card-heading"><span class="daily-card-icon">☕</span><span>ארוחות היום</span></div>
-          <div class="daily-card-main"><div class="mini-ring meals-mini-ring"><span id="todayMealCount">0/4</span></div><div><strong id="mealProgressHeadline">0 מתוך 4 ארוחות</strong><span>תכנון תזונתי יומי</span></div></div>
-          <button class="text-action" type="button" data-open-tab="tab-nutrition">צפייה בתזונה <span aria-hidden="true">←</span></button>
-        </article>
-        <article class="daily-card water-daily-card">
-          <div class="daily-card-heading"><span class="daily-card-icon">◉</span><span>מאזן מים יומי</span></div>
-          <div class="daily-card-main water-main"><div><strong><span id="waterProgressText" dir="ltr">0 / 2,800</span> מ״ל</strong><span>יעד השתייה היומי</span></div><span class="water-drop" aria-hidden="true">💧</span></div>
-          <div class="daily-progress-track"><span id="waterProgressBar"></span></div>
-          <button class="text-action" id="addWaterBtn" type="button">＋ כוס מים (250 מ״ל)</button>
-        </article>
-        <article class="daily-card sleep-daily-card">
-          <div class="daily-card-heading"><span class="daily-card-icon">☾</span><span>מעקב שינה</span></div>
-          <div class="daily-card-main sleep-main"><div><strong><span id="sleepHoursValue">7.5</span> שעות</strong><span id="sleepGoalText">יעד 8 שעות</span></div><span class="sleep-icon" aria-hidden="true">✦</span></div>
-          <form id="sleepForm" class="sleep-form">
-            <label for="sleepHoursInput">עדכון שעות שינה</label>
-            <input id="sleepHoursInput" type="number" name="hours" min="0" max="24" step="0.5" value="7.5" required>
-            <button type="submit" aria-label="שמירת שעות שינה">שמירה</button>
-          </form>
-        </article>
-      </div>
 
       <!-- Omega 3 to Omega 6 Ratio Tracking Component -->
-      <div class="glass-card" style="margin-bottom: 24px;">
+      <div class="glass-card nutrition-focus-card omega-focus-card">
         <div class="card-header-flex">
-          <h2>יחס אומגה 6:אומגה 3 (Omega-6 to Omega-3)</h2>
+          <h2>יחס אומגה 6:אומגה 3</h2>
           <span id="omegaRatioBadge" class="micro-status-pill good">יחס אופטימלי ✓</span>
         </div>
-        <div style="display: flex; gap: 20px; align-items: center; justify-content: space-around;">
-          <div>
-            <div style="font-size: 0.8rem; color: var(--text-muted);">אומגה 3 (Omega-3)</div>
-            <div style="font-size: 1.4rem; font-weight: 800; color: #38bdf8;" id="omega3Val">1.2g</div>
-          </div>
-          <div style="font-size: 1.5rem; font-weight: 800; color: var(--text-dim);">:</div>
-          <div>
-            <div style="font-size: 0.8rem; color: var(--text-muted);">אומגה 6 (Omega-6)</div>
-            <div style="font-size: 1.4rem; font-weight: 800; color: #f43f5e;" id="omega6Val">4.8g</div>
-          </div>
-          <div>
-            <div style="font-size: 0.8rem; color: var(--text-muted);">יחס נוכחי</div>
-            <div style="font-size: 1.4rem; font-weight: 800; color: var(--accent-primary);" id="calculatedOmegaRatio">1 : 4.0</div>
-          </div>
+        <div class="omega-focus-values">
+          <div><span>אומגה 3</span><strong id="omega3Val">1.2g</strong></div>
+          <span class="omega-focus-separator">:</span>
+          <div><span>אומגה 6</span><strong id="omega6Val">4.8g</strong></div>
+          <div><span>יחס נוכחי</span><strong id="calculatedOmegaRatio">1 : 4.0</strong></div>
         </div>
-        <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 10px;" id="omegaAdviceNote">
+        <p class="omega-advice-note" id="omegaAdviceNote">
           אומדן יחסי חומצות השומן במזונות שנרשמו. יחס אומגה 3:6 אינו ערך ייחוס רפואי או מדד להתאוששות.
         </p>
-        <p class="today-summary" id="todaySummary"></p>
       </div>
       <section class="micronutrient-card" aria-labelledby="micronutrientHeading">
         <div class="card-header-flex">
-          <div><span class="eyebrow">מעקב תזונתי יומי</span><h2 id="micronutrientHeading">מיקרו־נוטריאנטים ותובנות</h2></div>
+          <div><span class="eyebrow">מעקב תזונתי יומי</span><h2 id="micronutrientHeading">סיבים וערכים תזונתיים</h2></div>
           <span class="dashboard-icon">✦</span>
         </div>
         <div class="micro-grid">
@@ -208,21 +207,87 @@
           <article class="micro-item"><span>אשלגן</span><strong><span id="potassiumValue">0</span> <small>מ״ג</small></strong><div class="micro-track"><span id="potassiumProgress"></span></div><small>ערך יומי: 4,700 מ״ג</small></article>
           <article class="micro-item"><span>סיבים תזונתיים</span><strong><span id="fiberValue">0</span> <small>גרם</small></strong><div class="micro-track"><span id="fiberProgress"></span></div><small>ערך יומי: 28 גרם</small></article>
         </div>
+        <p class="nutrition-data-note">נתוני ויטמינים אינם זמינים כרגע במאגר המזון המקומי, ולכן לא מוצגים ערכים משוערים.</p>
         <p id="nutritionInsight" class="nutrition-insight" role="status"></p>
         <p class="nutrition-disclaimer">ערכי ייחוס כלליים למבוגרים, לא המלצה רפואית אישית. סוכר כולל אינו זהה לסוכר מוסף; יחסי אומגה הם אומדן מהמזונות שדווחו ואינם יעד רפואי.</p>
       </section>
+        </div>
+      </section>
+
+      <section class="dashboard-topic training-topic" aria-labelledby="trainingTopicTitle">
+        <div class="dashboard-topic-heading">
+          <span class="eyebrow">התקדמות לאורך זמן</span>
+          <h2 id="trainingTopicTitle">מיקוד־אימונים</h2>
+          <button class="btn-action-secondary" type="button" data-open-tab="tab-workouts">מעבר לתוכניות אימון</button>
+        </div>
+        <section class="workout-volume-section dashboard-workout-volume" aria-labelledby="weeklyMuscleVolumeTitle">
+          <div class="volume-section-heading">
+            <div><span class="eyebrow">סטים שהושלמו · 7 ימים אחרונים</span><h3 id="weeklyMuscleVolumeTitle">נפח שבועי לפי שריר ראשי</h3></div>
+            <span>כל סט נספר לפי השריר הראשי בלבד; לא נספרים שרירים משניים.</span>
+          </div>
+          <div class="weekly-muscle-volume-grid" id="weeklyMuscleVolumeGrid"></div>
+        </section>
+        <section class="muscle-work-chart-section workout-timeline-section" aria-labelledby="workoutTimelineTitle">
+          <div class="volume-section-heading">
+            <div><span class="eyebrow">אימון שהסתיים · נקודה לפי תאריך</span><h3 id="workoutTimelineTitle">עבודה בכל אימון</h3></div>
+            <span>כל נקודה היא אימון אחד בשמונת השבועות האחרונים · חזרות × משקל בסטים שהושלמו.</span>
+          </div>
+          <div class="muscle-work-chart-scroll"><svg id="workoutTimelineChart" class="muscle-work-chart workout-timeline-chart" role="img" aria-label="גרף עבודה לפי אימון ותאריך"></svg></div>
+          <p id="workoutTimelineEmpty" class="muscle-chart-empty" hidden>לאחר סיום אימון, תופיע כאן נקודה ביום שבו הוא בוצע.</p>
+        </section>
+        <section class="muscle-work-chart-section" aria-labelledby="muscleWorkChartTitle">
+          <div class="volume-section-heading">
+            <div><span class="eyebrow">סיכום שבועי · שריר ראשי בלבד</span><h3 id="muscleWorkChartTitle">עומס שבועי לפי קבוצת שריר ראשית</h3></div>
+            <span>כל נקודה מציגה שבוע קלנדרי; יחידות ק״ג־חזרה.</span>
+          </div>
+          <div class="muscle-work-chart-scroll"><svg id="muscleWorkChart" class="muscle-work-chart" role="img" aria-label="גרף עבודה שבועית לפי קבוצת שריר"></svg></div>
+          <p id="muscleWorkChartEmpty" class="muscle-chart-empty" hidden>אחרי שיושלמו אימונים, יוצג כאן גרף העבודה השבועית לפי קבוצת שריר ראשית.</p>
+          <div id="muscleWorkChartLegend" class="muscle-work-chart-legend"></div>
+        </section>
+      </section>
     </section>
+
+    <div class="dialog-backdrop nutrition-targets-backdrop" id="nutritionTargetsDialog" hidden>
+      <section class="dialog-card nutrition-targets-dialog" role="dialog" aria-modal="true" aria-labelledby="nutritionTargetsTitle">
+        <div class="dialog-header">
+          <div><span class="eyebrow">התאמה אישית</span><h2 id="nutritionTargetsTitle">עריכת יעדי התזונה</h2></div>
+          <button class="icon-button" id="closeNutritionTargetsBtn" type="button">סגירה</button>
+        </div>
+        <p class="nutrition-targets-intro">היעדים נשמרים בפרופיל המקומי שלך ומשמשים למעקב היומי.</p>
+        <form id="dailyTargetsForm" class="daily-targets-form" aria-label="עריכת יעדי הצריכה היומיים">
+          <label>קלוריות <input name="targetCalories" type="number" min="500" max="10000" step="50" required></label>
+          <label>חלבון (גרם) <input name="targetProtein" type="number" min="0" max="1000" step="1" required></label>
+          <label>פחמימות (גרם) <input name="targetCarbs" type="number" min="0" max="1500" step="1" required></label>
+          <label>שומן (גרם) <input name="targetFat" type="number" min="0" max="1000" step="1" required></label>
+          <button class="btn-action-primary" type="submit">שמירת יעדי תזונה</button>
+        </form>
+      </section>
+    </div>
 
     <!-- TAB 2: WORKOUTS (עם הפרדה ומצב "קצר בזמן") -->
     <section class="tab-pane" id="tab-workouts">
       <div class="card-header-flex">
         <h2>אימונים ותוכניות</h2>
         <div style="display: flex; gap: 10px;">
+          <label class="workout-trainee-picker" id="workoutTraineePicker" hidden>מתאמן נבחר <select id="workoutTraineeSelect"></select></label>
           <button class="btn-action-secondary" id="importRoutineCodeBtn">📥 ייבוא תוכנית (קוד/קישור)</button>
           <button class="btn-action-secondary trainer-equivalents-link" id="manageEquivalentExercisesBtn" type="button" hidden>ניהול תרגילים שקולים</button>
           <button class="btn-action-primary" id="openCreateWorkoutModalBtn">+ בנה אימון חדש</button>
         </div>
       </div>
+      <section class="training-wheel-section" id="trainingWheelSection" aria-labelledby="trainingWheelTitle">
+        <div class="volume-section-heading">
+          <div><span class="eyebrow">סדר קבוצות השרירים</span><h3 id="trainingWheelTitle">גלגל האימונים</h3></div>
+          <span id="trainingWheelDescription"></span>
+        </div>
+        <ol class="training-wheel-list" id="trainingWheelList"></ol>
+        <div class="training-wheel-editor" id="trainingWheelEditor" hidden>
+          <p>סדרו את הקטגוריות לפי הסדר הרצוי למתאמן הנבחר.</p>
+          <div class="training-wheel-add-row"><select id="trainingWheelAddSelect" aria-label="הוספת קבוצת שרירים לגלגל"></select><button class="btn-action-secondary" id="addTrainingWheelMuscleBtn" type="button">＋ הוספה</button></div>
+          <div id="trainingWheelEditorList"></div>
+          <button class="btn-action-secondary" id="saveTrainingWheelBtn" type="button">שמירת גלגל</button>
+        </div>
+      </section>
       <div class="workout-template-toolbar" aria-label="חיפוש וסינון תוכניות אימון">
         <label class="workout-template-search"><span aria-hidden="true">⌕</span><input id="workoutTemplateSearch" type="search" placeholder="חיפוש תוכנית או תרגיל..." autocomplete="off" aria-label="חיפוש תוכניות ותרגילים"></label>
         <div class="workout-template-filters" id="workoutTemplateFilters" role="group" aria-label="סינון לפי קבוצת שרירים"></div>
@@ -233,14 +298,6 @@
         <h3 id="recentWorkoutsTitle">האימונים האחרונים שלך</h3>
         <div class="recent-workout-grid" id="recentWorkoutGrid"></div>
       </section>
-      <section class="workout-volume-section" aria-labelledby="weeklyMuscleVolumeTitle">
-        <div class="volume-section-heading">
-          <div><span class="eyebrow">סטים שהושלמו · 7 ימים אחרונים</span><h3 id="weeklyMuscleVolumeTitle">נפח שבועי לפי שריר ראשי</h3></div>
-          <span>כל סט נספר פעם אחת בלבד לפי השריר הראשי בתוכנית.</span>
-        </div>
-        <div class="weekly-muscle-volume-grid" id="weeklyMuscleVolumeGrid"></div>
-      </section>
-
       <!-- SECTION A: WEEKLY PROGRAM SPLITS -->
       <div class="workouts-section">
         <h3 style="font-size: 1.2rem; color: var(--accent-primary); margin-bottom: 12px;">תוכניות אימון שבועיות (Weekly Program Splits)</h3>

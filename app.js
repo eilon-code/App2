@@ -9,6 +9,7 @@
     sharedRoutines: 'fitpulse_shared_routines',
     customRoutines: 'fitpulse_custom_routines',
     equivalentExercises: 'fitpulse_equivalent_exercises',
+    trainingWheels: 'fitpulse_demo_training_wheels',
     water: 'fitpulse_daily_water',
     sleep: 'fitpulse_daily_sleep',
     scannedFoods: 'fitpulse_scanned_foods'
@@ -51,6 +52,7 @@
     sharedRoutines: readStorage(STORAGE_KEYS.sharedRoutines, {}),
     customRoutines: readStorage(STORAGE_KEYS.customRoutines, []),
     equivalentExerciseGroups: readStorage(STORAGE_KEYS.equivalentExercises, []),
+    trainingWheels: readStorage(STORAGE_KEYS.trainingWheels, {}),
     waterLogs: readStorage(STORAGE_KEYS.water, {}),
     sleepLogs: readStorage(STORAGE_KEYS.sleep, {}),
     scannedFoods: readStorage(STORAGE_KEYS.scannedFoods, []),
@@ -74,6 +76,8 @@
     exerciseLibraryOnToggle: null,
     exerciseLibraryOnDone: null,
     selectedTraineeId: FIT_DATA.coachTrainees[0]?.id || '',
+    trainingWheelDraft: [],
+    trainingWheelDraftTraineeId: '',
     coachActivityFilter: 'all'
   };
   state.equivalentExerciseGroups = Array.isArray(state.equivalentExerciseGroups)
@@ -92,6 +96,13 @@
         getExerciseSubgroup(getExercise(id)) === group.subgroup))
     : [];
   let editingEquivalentGroupId = null;
+  state.trainingWheels = state.trainingWheels && typeof state.trainingWheels === 'object' && !Array.isArray(state.trainingWheels)
+    ? Object.fromEntries(Object.entries(state.trainingWheels).map(([traineeId, muscles]) => [
+      traineeId,
+      Array.isArray(muscles) ? [...new Set(muscles.filter(id =>
+        FIT_DATA.muscleGroups.some(group => group.id === id && id !== 'all')))] : []
+    ]))
+    : {};
 
   const numberFormat = new Intl.NumberFormat('he-IL', { maximumFractionDigits: 1 });
   let exerciseAnimationId = 0;
@@ -356,6 +367,25 @@
         ? 'יעד ייחוס לסוכר מוסף: 50 גרם'
         : 'נתוני סוכר מוסף אינם זמינים עדיין';
     }
+    const waterGoal = Number(state.profile.targetWaterMl) || 2800;
+    const waterIntake = Number(state.waterLogs[state.currentDate]) || 0;
+    const waterProgress = waterGoal ? Math.min(1, waterIntake / waterGoal) : 0;
+    const cupFill = byId('waterCupFill');
+    const cupSurface = byId('waterCupSurface');
+    const cupFillHeight = 103 * waterProgress;
+    const cupWaterY = 118 - cupFillHeight;
+    if (cupFill) {
+      cupFill.setAttribute('y', String(cupWaterY));
+      cupFill.setAttribute('height', String(cupFillHeight));
+    }
+    if (cupSurface) {
+      cupSurface.setAttribute('transform', `translate(0 ${cupWaterY})`);
+      cupSurface.setAttribute('d', 'M20 0 Q30 -4 40 0 T60 0 T80 0 T100 0');
+      cupSurface.style.opacity = waterProgress > 0 ? '1' : '0';
+    }
+    const waterCup = document.querySelector('.water-measuring-cup');
+    if (waterCup) waterCup.setAttribute('aria-label',
+      `מאזן מים יומי: ${formatNumber(waterIntake)} מיליליטר מתוך ${formatNumber(waterGoal)} מיליליטר`);
     if (byId('nutritionInsight')) {
       let insight;
       if (totals.sodium > 2300) {
@@ -386,6 +416,9 @@
 
     const summary = byId('todaySummary');
     if (summary) summary.textContent = `${formatNumber(target ? (totals.calories / target) * 100 : 0)}% מיעד הקלוריות · ${todayWorkouts().length} אימונים היום`;
+    renderWeeklyMuscleVolume();
+    renderWorkoutTimelineChart();
+    renderMuscleWorkChart();
   }
 
   function getExercise(exerciseId) {
@@ -434,7 +467,11 @@
   }
 
   function renderWorkoutCard(plan) {
+    const trainer = isTrainerRole();
+    const isAssignedRoutine = Boolean(plan.audienceTraineeId || plan.id.startsWith('assigned-'));
     const card = createElement('article', 'workout-plan-card');
+    if (trainer && !isAssignedRoutine) card.append(createElement('span', 'routine-kind-badge', 'תבנית מאמן'));
+    if (trainer && isAssignedRoutine) card.append(createElement('span', 'routine-kind-badge assigned', 'תוכנית למתאמן'));
     card.append(createElement('span', 'plan-duration', `⏱️ ${plan.durationMinutes || 0} דק׳`),
       createElement('h3', 'plan-title', WORKOUT_CARD_LABELS[plan.id] || plan.name));
     if (plan.subtitle) card.append(createElement('p', 'plan-sub', plan.subtitle));
@@ -449,12 +486,38 @@
         card.append(preview);
       }
     }
+    const preview = document.createElement('details');
+    preview.className = 'workout-exercise-details';
+    preview.append(createElement('summary', '', `עיון בתרגילים (${plan.exercises.length})`));
+    plan.exercises.forEach(entry => {
+      const exercise = getExercise(entry.preferredExerciseId || entry.exerciseId);
+      if (!exercise) return;
+      const item = createElement('article', 'workout-exercise-detail');
+      const heading = createElement('div', 'workout-exercise-detail-heading');
+      heading.append(createExerciseAnimation(exercise, true), createElement('strong', '', exercise.name));
+      item.append(heading, createElement('small', '', `${muscleLabel(entry.muscleGroup || exercise.muscle)} · ${entry.subgroup || getExerciseSubgroup(exercise)} · ${exercise.equipment}`));
+      if (exercise.tips) item.append(createElement('p', '', exercise.tips));
+      const equivalentNames = getRoutineCandidateExerciseIds(entry).filter(id => id !== exercise.id)
+        .map(id => getExercise(id)).filter(Boolean)
+        .map(candidate => `${candidate.name} · ${candidate.equipment}`);
+      if (equivalentNames.length) {
+        item.append(createElement('small', 'workout-equivalent-preview', `תרגילים שקולים שאושרו: ${equivalentNames.join(' · ')}`));
+      } else {
+        item.append(createElement('small', 'workout-equivalent-preview', 'לא הוגדרו לתרגיל זה חלופות שקולות על ידי המאמן.'));
+      }
+      preview.append(item);
+    });
+    card.append(preview);
     const actions = createElement('div', 'plan-actions');
-    const startButton = createElement('button', 'btn-action-primary', 'להתחל');
+    const startButton = createElement('button', 'btn-action-primary', trainer ? 'תצוגת אימון' : 'להתחלת האימון');
     startButton.type = 'button';
     startButton.addEventListener('click', () => startWorkout(plan));
     actions.append(startButton);
 
+    if (!trainer) {
+      card.append(actions);
+      return card;
+    }
     const moreOptions = document.createElement('details');
     moreOptions.className = 'plan-more-options';
     const moreSummary = createElement('summary', 'plan-more-summary', 'עוד פעולות');
@@ -483,7 +546,23 @@
       audienceTraineeId: undefined,
       exercises: plan.exercises.map(entry => ({ ...entry }))
     }));
-    moreMenu.append(editButton, duplicateButton, crunchStartButton, shareButton);
+    if (trainer) {
+      moreMenu.append(editButton, duplicateButton);
+      if (!isAssignedRoutine && state.selectedTraineeId) {
+        const assignButton = createElement('button', 'btn-action-secondary assign-plan-btn', 'התאמה למתאמן הנבחר');
+        assignButton.type = 'button';
+        assignButton.addEventListener('click', () => createWorkoutModal({
+          ...plan,
+          id: `custom-${Date.now()}`,
+          isDuplicate: true,
+          sourceRoutineId: plan.id,
+          audienceTraineeId: state.selectedTraineeId,
+          exercises: plan.exercises.map(entry => ({ ...entry }))
+        }));
+        moreMenu.append(assignButton);
+      }
+    }
+    moreMenu.append(crunchStartButton, shareButton);
     moreOptions.append(moreSummary, moreMenu);
     actions.append(moreOptions);
     card.append(actions);
@@ -524,12 +603,43 @@
     return figure;
   }
 
+  function getTraineeAssignedPlans(traineeId) {
+    const assignments = readStorage('fitpulse_demo_assignments', {});
+    const storedPlans = (Array.isArray(assignments?.[traineeId]) ? assignments[traineeId] : [])
+      .filter(validateRoutine);
+    const localPlans = FIT_DATA.presetWorkouts
+      .filter(plan => plan.audienceTraineeId === traineeId && validateRoutine(plan));
+    return [...new Map([...storedPlans, ...localPlans].map(plan => [plan.id, plan])).values()];
+  }
+
   function renderWorkoutsTab() {
     const weeklyGrid = byId('weeklySplitsGrid');
     const sessionGrid = byId('individualSessionsGrid');
     const recentGrid = byId('recentWorkoutGrid');
     const recentSection = byId('recentWorkoutsSection');
     if (!weeklyGrid || !sessionGrid) return;
+    const trainer = isTrainerRole();
+    if (byId('workoutTraineePicker')) byId('workoutTraineePicker').hidden = !trainer;
+    if (byId('workoutTraineeSelect')) {
+      const select = byId('workoutTraineeSelect');
+      const selectedId = state.selectedTraineeId;
+      select.replaceChildren();
+      FIT_DATA.coachTrainees.forEach(trainee => {
+        const option = document.createElement('option');
+        option.value = trainee.id;
+        option.textContent = trainee.name;
+        select.append(option);
+      });
+      if ([...select.options].some(option => option.value === selectedId)) select.value = selectedId;
+    }
+    if (byId('openCreateWorkoutModalBtn')) {
+      byId('openCreateWorkoutModalBtn').hidden = !trainer;
+      byId('openCreateWorkoutModalBtn').textContent = trainer ? '+ יצירת תבנית אימון' : '+ בנה אימון חדש';
+    }
+    if (byId('importRoutineCodeBtn')) byId('importRoutineCodeBtn').hidden = !trainer;
+    const traineePlans = getTraineeAssignedPlans(state.profile.demoTraineeId || FIT_DATA.coachTrainees[0]?.id);
+    if (byId('headerStartWorkoutBtn')) byId('headerStartWorkoutBtn').disabled = !trainer && !traineePlans.length;
+    renderTrainingWheel();
     weeklyGrid.replaceChildren();
     sessionGrid.replaceChildren();
     const search = byId('workoutTemplateSearch');
@@ -553,20 +663,19 @@
       button.classList.toggle('active', active);
       button.setAttribute('aria-pressed', String(active));
     });
-    const demoTraineeId = state.profile.demoTraineeId || FIT_DATA.coachTrainees[0]?.id;
-    const plans = FIT_DATA.presetWorkouts.filter(plan =>
-      !plan.audienceTraineeId || isTrainerRole() || plan.audienceTraineeId === demoTraineeId
-    );
-    const assignments = readStorage('fitpulse_demo_assignments', {});
-    const assignedPlans = Array.isArray(assignments?.[demoTraineeId])
-      ? assignments[demoTraineeId].filter(validateRoutine)
-      : [];
-    assignedPlans.forEach(plan => {
-      if (!plans.some(existing => existing.id === plan.id || existing.sourceRoutineId === plan.id)) {
-        plans.push({ ...plan, id: `assigned-${plan.id}`, sourceRoutineId: plan.id, audienceTraineeId: demoTraineeId });
-      }
-    });
-    plans.sort((left, right) => {
+    const demoTraineeId = isTrainerRole()
+      ? state.selectedTraineeId
+      : state.profile.demoTraineeId || FIT_DATA.coachTrainees[0]?.id;
+    const assignedPlans = getTraineeAssignedPlans(demoTraineeId)
+      .map(plan => ({
+        ...plan,
+        id: `assigned-${plan.id}`,
+        sourceRoutineId: plan.sourceRoutineId || plan.id,
+        audienceTraineeId: demoTraineeId
+      }));
+    const plans = trainer ? [...FIT_DATA.presetWorkouts.filter(plan => !plan.audienceTraineeId), ...assignedPlans] : assignedPlans;
+    const distinctPlans = [...new Map(plans.map(plan => [plan.id, plan])).values()];
+    distinctPlans.sort((left, right) => {
       const leftIndex = WORKOUT_CARD_ORDER.indexOf(left.id);
       const rightIndex = WORKOUT_CARD_ORDER.indexOf(right.id);
       if (leftIndex < 0 && rightIndex < 0) return 0;
@@ -582,8 +691,8 @@
       const recentPlans = [];
       const seenPlanIds = new Set();
       latestWorkouts.forEach(workout => {
-        const plan = plans.find(item => item.id === workout.routineId) ||
-          plans.find(item => item.name === workout.name);
+        const plan = distinctPlans.find(item => item.id === workout.routineId || item.sourceRoutineId === workout.routineId) ||
+            distinctPlans.find(item => item.name === workout.name);
         if (plan && !seenPlanIds.has(plan.id)) {
           seenPlanIds.add(plan.id);
           recentPlans.push({ plan, workout });
@@ -607,8 +716,8 @@
       recentSection.hidden = !recentPlans.length || Boolean(state.workoutQuery.trim()) || state.workoutFilter !== 'all';
     }
     const query = state.workoutQuery.trim().toLocaleLowerCase();
-    const filteredPlans = plans.filter(plan => {
-      const matchingExercises = plan.exercises.map(entry => getExercise(entry.exerciseId)).filter(Boolean);
+    const filteredPlans = distinctPlans.filter(plan => {
+      const matchingExercises = plan.exercises.map(entry => getExercise(entry.preferredExerciseId || entry.exerciseId)).filter(Boolean);
       const muscleMatches = state.workoutFilter === 'all' || matchingExercises.some(exercise =>
         (plan.exercises.find(entry => entry.exerciseId === exercise.id)?.muscleGroup || exercise.muscle) === state.workoutFilter ||
         exercise.muscle === state.workoutFilter);
@@ -627,8 +736,12 @@
     const count = weeklyGrid.childElementCount + sessionGrid.childElementCount;
     if (byId('workoutTemplateStatus')) {
       byId('workoutTemplateStatus').textContent = count
-        ? `${count} תוכניות · מסננים תרגילים לפי שם וקבוצת שרירים`
-        : 'לא נמצאו תוכניות מתאימות. נסו לשנות את החיפוש או המסנן.';
+        ? trainer
+          ? `${count} תוכניות ותבניות · משויכות למתאמן: ${FIT_DATA.coachTrainees.find(item => item.id === demoTraineeId)?.name || 'נבחר'}`
+          : `${count} תוכניות אימון זמינות · אפשר לעיין בתרגילים, באנימציות ובחלופות המאושרות`
+        : trainer
+          ? 'אין תוכניות זמינות למסנן זה. אפשר לבחור תבנית או ליצור תוכנית למתאמן.'
+          : 'עדיין לא הוקצו תוכניות אימון למתאמן זה.';
     }
     document.querySelectorAll('.workouts-section').forEach(section => {
       const grid = section.querySelector('.preset-workouts-grid');
@@ -663,6 +776,281 @@
         createElement('small', '', 'סטים'));
       grid.append(card);
     });
+  }
+
+  function renderTrainingWheel() {
+    const section = byId('trainingWheelSection');
+    const list = byId('trainingWheelList');
+    const editor = byId('trainingWheelEditor');
+    const description = byId('trainingWheelDescription');
+    const editorList = byId('trainingWheelEditorList');
+    const addSelect = byId('trainingWheelAddSelect');
+    if (!section || !list || !editor || !editorList || !addSelect) return;
+    const trainer = isTrainerRole();
+    const traineeId = trainer
+      ? state.selectedTraineeId
+      : state.profile.demoTraineeId || FIT_DATA.coachTrainees[0]?.id;
+    section.hidden = false;
+    editor.hidden = !trainer;
+    const savedWheel = state.trainingWheels[traineeId] || [];
+    if (trainer && state.trainingWheelDraftTraineeId !== traineeId) {
+      state.trainingWheelDraft = [...savedWheel];
+      state.trainingWheelDraftTraineeId = traineeId;
+    }
+    const wheel = trainer ? state.trainingWheelDraft : savedWheel;
+    if (description) description.textContent = trainer
+      ? `עריכת סדר קבוצות השרירים עבור ${FIT_DATA.coachTrainees.find(item => item.id === traineeId)?.name || 'המתאמן הנבחר'}.`
+      : 'הסדר נקבע על ידי המאמן שלך.';
+    list.replaceChildren();
+    if (!wheel.length) {
+      list.append(createElement('li', 'training-wheel-empty', trainer
+        ? 'הגלגל עדיין לא הוגדר. הוסיפו קבוצות שרירים ובחרו את הסדר.'
+        : 'המאמן עדיין לא הגדיר גלגל קבוצות שרירים.'));
+    } else {
+      wheel.forEach((muscle, index) => {
+        const item = createElement('li', 'training-wheel-item');
+        item.append(createElement('span', 'training-wheel-position', String(index + 1)),
+          createElement('strong', '', muscleLabel(muscle)));
+        if (index < wheel.length - 1) item.append(createElement('span', 'training-wheel-arrow', '→'));
+        list.append(item);
+      });
+    }
+    if (!trainer) return;
+    const options = FIT_DATA.muscleGroups.filter(group => group.id !== 'all' && !wheel.includes(group.id));
+    fillSelect(addSelect, options.map(group => ({ value: group.id, label: muscleLabel(group.id) })),
+      options[0]?.id, options.length ? '' : 'כל הקבוצות נוספו');
+    const addButton = byId('addTrainingWheelMuscleBtn');
+    if (addButton) addButton.disabled = !options.length;
+    editorList.replaceChildren();
+    wheel.forEach((muscle, index) => {
+      const row = createElement('div', 'training-wheel-editor-row');
+      row.append(createElement('strong', '', `${index + 1}. ${muscleLabel(muscle)}`));
+      const up = createElement('button', 'icon-button', '↑');
+      up.type = 'button';
+      up.disabled = index === 0;
+      up.setAttribute('aria-label', `העבר ${muscleLabel(muscle)} למעלה`);
+      up.addEventListener('click', () => {
+        [state.trainingWheelDraft[index - 1], state.trainingWheelDraft[index]] =
+          [state.trainingWheelDraft[index], state.trainingWheelDraft[index - 1]];
+        renderTrainingWheel();
+      });
+      const down = createElement('button', 'icon-button', '↓');
+      down.type = 'button';
+      down.disabled = index === wheel.length - 1;
+      down.setAttribute('aria-label', `העבר ${muscleLabel(muscle)} למטה`);
+      down.addEventListener('click', () => {
+        [state.trainingWheelDraft[index + 1], state.trainingWheelDraft[index]] =
+          [state.trainingWheelDraft[index], state.trainingWheelDraft[index + 1]];
+        renderTrainingWheel();
+      });
+      const remove = createElement('button', 'icon-button', 'הסרה');
+      remove.type = 'button';
+      remove.addEventListener('click', () => {
+        state.trainingWheelDraft.splice(index, 1);
+        renderTrainingWheel();
+      });
+      row.append(up, down, remove);
+      editorList.append(row);
+    });
+  }
+
+  function renderMuscleWorkChart() {
+    const chart = byId('muscleWorkChart');
+    const legend = byId('muscleWorkChartLegend');
+    const empty = byId('muscleWorkChartEmpty');
+    if (!chart || !legend || !empty) return;
+    const namespace = 'http://www.w3.org/2000/svg';
+    const width = 820;
+    const height = 290;
+    const padding = { top: 18, right: 20, bottom: 42, left: 58 };
+    const plotWidth = width - padding.left - padding.right;
+    const plotHeight = height - padding.top - padding.bottom;
+    const today = new Date();
+    const currentMonday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    currentMonday.setDate(currentMonday.getDate() - ((currentMonday.getDay() + 6) % 7));
+    const weeks = Array.from({ length: 8 }, (_, index) => {
+      const start = new Date(currentMonday);
+      start.setDate(start.getDate() - (7 - index) * 7);
+      return { start, values: new Map(FIT_DATA.muscleGroups.filter(group => group.id !== 'all').map(group => [group.id, 0])) };
+    });
+    const weekStarts = weeks.map(week => localDateKey(week.start));
+    Object.entries(state.workoutLogs || {}).forEach(([date, workouts]) => {
+      if (!Array.isArray(workouts)) return;
+      const workoutDate = new Date(`${date}T12:00:00`);
+      const monday = new Date(workoutDate.getFullYear(), workoutDate.getMonth(), workoutDate.getDate());
+      monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+      const weekIndex = weekStarts.indexOf(localDateKey(monday));
+      if (weekIndex < 0) return;
+      workouts.forEach(workout => (workout.setLogs || []).filter(set => set.completed).forEach(set => {
+        const muscle = set.muscleGroup || getExercise(set.exerciseId)?.muscle;
+        const total = (Number(set.weight) || 0) * (Number(set.reps) || 0);
+        if (weeks[weekIndex].values.has(muscle)) {
+          weeks[weekIndex].values.set(muscle, weeks[weekIndex].values.get(muscle) + total);
+        }
+      }));
+    });
+    const maxValue = Math.max(0, ...weeks.flatMap(week => [...week.values.values()]));
+    const scaleMax = maxValue ? Math.ceil(maxValue / 100) * 100 : 100;
+    const xAt = index => padding.left + (plotWidth * index) / (weeks.length - 1);
+    const yAt = value => padding.top + plotHeight - (value / scaleMax) * plotHeight;
+    chart.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    chart.replaceChildren();
+    const title = document.createElementNS(namespace, 'title');
+    title.textContent = 'עבודה שבועית לפי שריר ראשי: סכום חזרות כפול משקל בכל סט שהושלם';
+    chart.append(title);
+    for (let line = 0; line <= 4; line += 1) {
+      const value = scaleMax * line / 4;
+      const y = yAt(value);
+      const gridLine = document.createElementNS(namespace, 'line');
+      gridLine.setAttribute('x1', String(padding.left));
+      gridLine.setAttribute('x2', String(width - padding.right));
+      gridLine.setAttribute('y1', String(y));
+      gridLine.setAttribute('y2', String(y));
+      gridLine.setAttribute('class', 'muscle-chart-gridline');
+      chart.append(gridLine);
+      const label = document.createElementNS(namespace, 'text');
+      label.setAttribute('x', String(padding.left - 9));
+      label.setAttribute('y', String(y + 4));
+      label.setAttribute('text-anchor', 'end');
+      label.setAttribute('class', 'muscle-chart-axis-label');
+      label.textContent = formatNumber(value);
+      chart.append(label);
+    }
+    weeks.forEach((week, index) => {
+      const label = document.createElementNS(namespace, 'text');
+      label.setAttribute('x', String(xAt(index)));
+      label.setAttribute('y', String(height - 12));
+      label.setAttribute('text-anchor', 'middle');
+      label.setAttribute('class', 'muscle-chart-axis-label');
+      label.textContent = week.start.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit' });
+      chart.append(label);
+    });
+    const palette = ['#a78bfa', '#8b7bff', '#c084fc', '#60a5fa', '#f472b6', '#34d399', '#fbbf24'];
+    legend.replaceChildren();
+    FIT_DATA.muscleGroups.filter(group => group.id !== 'all').forEach((group, muscleIndex) => {
+      const color = palette[muscleIndex % palette.length];
+      const item = createElement('span', 'muscle-work-chart-legend-item');
+      const swatch = createElement('i', '');
+      swatch.style.backgroundColor = color;
+      item.append(swatch, document.createTextNode(muscleLabel(group.id)));
+      legend.append(item);
+      const values = weeks.map(week => week.values.get(group.id) || 0);
+      if (!values.some(value => value > 0)) return;
+      const path = document.createElementNS(namespace, 'path');
+      path.setAttribute('d', values.map((value, index) =>
+        `${index === 0 ? 'M' : 'L'} ${xAt(index)} ${yAt(value)}`).join(' '));
+      path.setAttribute('class', 'muscle-work-series');
+      path.setAttribute('stroke', color);
+      path.setAttribute('aria-label', `${muscleLabel(group.id)}: ${values.map(formatNumber).join(', ')}`);
+      chart.append(path);
+      values.forEach((value, index) => {
+        const point = document.createElementNS(namespace, 'circle');
+        point.setAttribute('cx', String(xAt(index)));
+        point.setAttribute('cy', String(yAt(value)));
+        point.setAttribute('r', '3.5');
+        point.setAttribute('class', 'muscle-work-point');
+        point.setAttribute('fill', color);
+        point.append(document.createElementNS(namespace, 'title'));
+        point.lastChild.textContent = `${muscleLabel(group.id)} · ${weeks[index].start.toLocaleDateString('he-IL')}: ${formatNumber(value)} ק״ג־חזרה`;
+        chart.append(point);
+      });
+    });
+    empty.hidden = Boolean(maxValue);
+  }
+
+  function renderWorkoutTimelineChart() {
+    const chart = byId('workoutTimelineChart');
+    const empty = byId('workoutTimelineEmpty');
+    if (!chart || !empty) return;
+    const namespace = 'http://www.w3.org/2000/svg';
+    const width = 820;
+    const height = 260;
+    const padding = { top: 18, right: 24, bottom: 42, left: 64 };
+    const plotWidth = width - padding.left - padding.right;
+    const plotHeight = height - padding.top - padding.bottom;
+    const today = new Date();
+    const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const start = new Date(end);
+    start.setDate(start.getDate() - 55);
+    const dayNumber = date => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000;
+    const firstDay = dayNumber(start);
+    const daySpan = dayNumber(end) - firstDay || 1;
+    const sessions = Object.entries(state.workoutLogs || {})
+      .flatMap(([dateKey, workouts]) => (Array.isArray(workouts) ? workouts : []).map(workout => {
+        const completedDate = workout.completedAt ? new Date(workout.completedAt) : new Date(`${dateKey}T12:00:00`);
+        if (Number.isNaN(completedDate.getTime())) return null;
+        const performedDate = new Date(completedDate.getFullYear(), completedDate.getMonth(), completedDate.getDate());
+        const performedDay = dayNumber(performedDate);
+        if (performedDay < firstDay || performedDay > dayNumber(end)) return null;
+        const volume = Number.isFinite(Number(workout.totalVolume))
+          ? Number(workout.totalVolume)
+          : (workout.setLogs || []).filter(set => set.completed)
+            .reduce((sum, set) => sum + (Number(set.weight) || 0) * (Number(set.reps) || 0), 0);
+        return { name: workout.name || 'אימון', date: performedDate, day: performedDay, volume };
+      }))
+      .filter(Boolean)
+      .sort((left, right) => left.day - right.day);
+    const maximum = Math.max(0, ...sessions.map(session => session.volume));
+    const scaleMax = maximum ? Math.ceil(maximum / 100) * 100 : 100;
+    const xAt = day => padding.left + ((day - firstDay) / daySpan) * plotWidth;
+    const yAt = value => padding.top + plotHeight - (value / scaleMax) * plotHeight;
+    chart.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    chart.replaceChildren();
+    const title = document.createElementNS(namespace, 'title');
+    title.textContent = 'עבודה בכל אימון שהסתיים, לפי תאריך האימון';
+    chart.append(title);
+    for (let line = 0; line <= 4; line += 1) {
+      const value = scaleMax * line / 4;
+      const y = yAt(value);
+      const gridLine = document.createElementNS(namespace, 'line');
+      gridLine.setAttribute('x1', String(padding.left));
+      gridLine.setAttribute('x2', String(width - padding.right));
+      gridLine.setAttribute('y1', String(y));
+      gridLine.setAttribute('y2', String(y));
+      gridLine.setAttribute('class', 'muscle-chart-gridline');
+      chart.append(gridLine);
+      const label = document.createElementNS(namespace, 'text');
+      label.setAttribute('x', String(padding.left - 9));
+      label.setAttribute('y', String(y + 4));
+      label.setAttribute('text-anchor', 'end');
+      label.setAttribute('class', 'muscle-chart-axis-label');
+      label.textContent = formatNumber(value);
+      chart.append(label);
+    }
+    const tickDates = Array.from({ length: 8 }, (_, index) => {
+      const tick = new Date(start);
+      tick.setDate(tick.getDate() + index * 7);
+      return tick;
+    });
+    tickDates.push(end);
+    tickDates.forEach((date, index) => {
+      const label = document.createElementNS(namespace, 'text');
+      label.setAttribute('x', String(xAt(dayNumber(date))));
+      label.setAttribute('y', String(height - 12));
+      label.setAttribute('text-anchor', index === 0 ? 'start' : index === tickDates.length - 1 ? 'end' : 'middle');
+      label.setAttribute('class', 'muscle-chart-axis-label');
+      label.textContent = date.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit' });
+      chart.append(label);
+    });
+    if (sessions.length > 1) {
+      const line = document.createElementNS(namespace, 'path');
+      line.setAttribute('d', sessions.map((session, index) =>
+        `${index === 0 ? 'M' : 'L'} ${xAt(session.day)} ${yAt(session.volume)}`).join(' '));
+      line.setAttribute('class', 'workout-timeline-line');
+      chart.append(line);
+    }
+    sessions.forEach(session => {
+      const point = document.createElementNS(namespace, 'circle');
+      point.setAttribute('cx', String(xAt(session.day)));
+      point.setAttribute('cy', String(yAt(session.volume)));
+      point.setAttribute('r', '5');
+      point.setAttribute('class', 'workout-timeline-point');
+      const pointTitle = document.createElementNS(namespace, 'title');
+      pointTitle.textContent = `${session.name} · ${session.date.toLocaleDateString('he-IL')} · ${formatNumber(session.volume)} ק״ג־חזרה`;
+      point.append(pointTitle);
+      chart.append(point);
+    });
+    empty.hidden = sessions.length > 0;
   }
 
   function renderNutrition() {
@@ -1243,18 +1631,20 @@
     if (select) {
       const current = state.selectedTraineeId;
       select.replaceChildren();
-      trainees.forEach(trainee => {
+      FIT_DATA.coachTrainees.forEach(trainee => {
         const option = document.createElement('option');
         option.value = trainee.id;
         option.textContent = trainee.name;
         select.append(option);
       });
-      if (trainees.some(trainee => trainee.id === current)) select.value = current;
-      else if (trainees[0]) {
-        state.selectedTraineeId = trainees[0].id;
-        select.value = trainees[0].id;
+      if (FIT_DATA.coachTrainees.some(trainee => trainee.id === current)) select.value = current;
+      else if (FIT_DATA.coachTrainees[0]) {
+        state.selectedTraineeId = FIT_DATA.coachTrainees[0].id;
+        select.value = state.selectedTraineeId;
+        state.trainingWheelDraftTraineeId = '';
       } else {
         state.selectedTraineeId = '';
+        state.trainingWheelDraftTraineeId = '';
       }
     }
     const nutritionRows = byId('coachNutritionRows');
@@ -1619,7 +2009,7 @@
     renderEquivalentExerciseManager();
   }
 
-  function createWorkoutModal(existingPlan = null) {
+  function createWorkoutModal(existingPlan = null, targetTraineeId = null) {
     const overlay = createElement('div', 'dialog-backdrop');
     overlay.id = 'createWorkoutDialog';
     const dialog = createElement('section', 'dialog-card');
@@ -1875,8 +2265,8 @@
         durationMinutes: Number(durationInput.value), level: existingPlan?.level || 'אישי',
         badge: existingPlan?.badge || '✨ אימון אישי', defaultRestSeconds: Number(restInput.value),
         recoveryGoal: recoverySelect.value,
-        ...(isTrainerRole() && state.selectedTraineeId
-          ? { audienceTraineeId: state.selectedTraineeId }
+        ...((targetTraineeId || existingPlan?.audienceTraineeId)
+          ? { audienceTraineeId: targetTraineeId || existingPlan.audienceTraineeId }
           : existingPlan?.audienceTraineeId ? { audienceTraineeId: existingPlan.audienceTraineeId } : {}),
         ...((existingPlan?.sourceRoutineId || existingPlan?.id.startsWith('assigned-'))
           ? { sourceRoutineId: existingPlan.sourceRoutineId || existingPlan.id.slice('assigned-'.length) } : {}),
@@ -1889,13 +2279,15 @@
       if (savedIndex >= 0) state.customRoutines[savedIndex] = plan;
       else state.customRoutines.push(plan);
       if (!writeStorage(STORAGE_KEYS.customRoutines, state.customRoutines)) return;
-      if (isTrainerRole() && state.selectedTraineeId) {
+      const assignmentTraineeId = targetTraineeId || existingPlan?.audienceTraineeId;
+      if (isTrainerRole() && assignmentTraineeId) {
         const assignments = readStorage('fitpulse_demo_assignments', {});
-        const traineeAssignments = assignments[state.selectedTraineeId] || [];
-        const assignedIndex = traineeAssignments.findIndex(item => item.id === plan.sourceRoutineId);
+        const traineeAssignments = assignments[assignmentTraineeId] || [];
+        const assignedIndex = traineeAssignments.findIndex(item =>
+          item.id === plan.sourceRoutineId || item.sourceRoutineId === plan.sourceRoutineId);
         if (assignedIndex >= 0) traineeAssignments[assignedIndex] = plan;
         else traineeAssignments.push(plan);
-        assignments[state.selectedTraineeId] = traineeAssignments;
+        assignments[assignmentTraineeId] = traineeAssignments;
         if (writeStorage('fitpulse_demo_assignments', assignments)) {
           alert('התוכנית נשמרה בתצוגת ההדגמה בדפדפן זה בלבד; אין סנכרון לחשבון מתאמן אחר.');
         }
@@ -2590,9 +2982,12 @@
       if (event.key === 'Enter' || event.key === ' ') setTab('tab-dashboard');
     });
     byId('headerStartWorkoutBtn')?.addEventListener('click', () => {
-      const plan = FIT_DATA.presetWorkouts.find(item => item.section === 'individual_session') ||
-        FIT_DATA.presetWorkouts[0];
+      const plans = isTrainerRole()
+        ? FIT_DATA.presetWorkouts.filter(item => !item.audienceTraineeId)
+        : getTraineeAssignedPlans(state.profile.demoTraineeId || FIT_DATA.coachTrainees[0]?.id);
+      const plan = plans.find(item => item.section === 'individual_session') || plans[0];
       if (plan) startWorkout(plan);
+      else alert('עדיין לא הוקצתה לך תוכנית אימון. בקש מהמאמן להקצות תוכנית זמינה.');
     });
     byId('demoRoleToggleBtn')?.addEventListener('click', () => {
       state.profile.role = isTrainerRole() ? 'trainee' : 'trainer_admin';
@@ -2673,6 +3068,10 @@
           byId('barcodeScannerDialog').hidden = true;
         }
         if (byId('exerciseLibraryDialog')) byId('exerciseLibraryDialog').hidden = true;
+        if (byId('nutritionTargetsDialog') && !byId('nutritionTargetsDialog').hidden) {
+          byId('nutritionTargetsDialog').hidden = true;
+          byId('openNutritionTargetsBtn')?.focus();
+        }
         byId('createWorkoutDialog')?.remove();
       }
     });
@@ -2713,9 +3112,53 @@
       }
       state.profile = { ...state.profile, ...nextTargets };
       if (writeStorage(STORAGE_KEYS.profile, state.profile)) renderDashboard();
+      else return;
+      byId('nutritionTargetsDialog').hidden = true;
+      byId('openNutritionTargetsBtn')?.focus();
+    });
+    byId('openNutritionTargetsBtn')?.addEventListener('click', () => {
+      const dialog = byId('nutritionTargetsDialog');
+      if (!dialog) return;
+      dialog.hidden = false;
+      dialog.querySelector('input')?.focus();
+    });
+    byId('closeNutritionTargetsBtn')?.addEventListener('click', () => {
+      byId('nutritionTargetsDialog').hidden = true;
+      byId('openNutritionTargetsBtn')?.focus();
+    });
+    byId('nutritionTargetsDialog')?.addEventListener('click', event => {
+      if (event.target === byId('nutritionTargetsDialog')) {
+        byId('nutritionTargetsDialog').hidden = true;
+        byId('openNutritionTargetsBtn')?.focus();
+      }
     });
     byId('openCreateWorkoutModalBtn')?.addEventListener('click', () => createWorkoutModal());
-    byId('coachBuildProgramBtn')?.addEventListener('click', () => createWorkoutModal());
+    byId('coachBuildProgramBtn')?.addEventListener('click', () => createWorkoutModal(null, state.selectedTraineeId));
+    byId('workoutTraineeSelect')?.addEventListener('change', event => {
+      state.selectedTraineeId = event.currentTarget.value;
+      state.trainingWheelDraftTraineeId = '';
+      const coachSelect = byId('coachTraineeSelect');
+      if (coachSelect && [...coachSelect.options].some(option => option.value === state.selectedTraineeId)) {
+        coachSelect.value = state.selectedTraineeId;
+      }
+      renderWorkoutsTab();
+    });
+    byId('addTrainingWheelMuscleBtn')?.addEventListener('click', () => {
+      const muscle = byId('trainingWheelAddSelect')?.value;
+      if (!muscle || state.trainingWheelDraft.includes(muscle)) return;
+      state.trainingWheelDraft.push(muscle);
+      renderTrainingWheel();
+    });
+    byId('saveTrainingWheelBtn')?.addEventListener('click', () => {
+      if (!isTrainerRole() || !state.selectedTraineeId) return;
+      const nextTrainingWheels = {
+        ...state.trainingWheels,
+        [state.selectedTraineeId]: [...state.trainingWheelDraft]
+      };
+      if (!writeStorage(STORAGE_KEYS.trainingWheels, nextTrainingWheels)) return;
+      state.trainingWheels = nextTrainingWheels;
+      renderTrainingWheel();
+    });
     byId('manageEquivalentExercisesBtn')?.addEventListener('click', () => setTab('tab-equivalents'));
     byId('equivalentsBackBtn')?.addEventListener('click', () => setTab('tab-workouts'));
     byId('equivalentExerciseForm')?.addEventListener('submit', saveEquivalentExerciseGroup);
@@ -2761,6 +3204,8 @@
     });
     byId('coachTraineeSelect')?.addEventListener('change', event => {
       state.selectedTraineeId = event.currentTarget.value;
+      state.trainingWheelDraftTraineeId = '';
+      renderWorkoutsTab();
     });
     byId('importRoutineCodeBtn')?.addEventListener('click', importRoutine);
     byId('timeCrunchToggleBtn')?.addEventListener('click', toggleTimeCrunchMode);
